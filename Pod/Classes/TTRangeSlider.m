@@ -6,12 +6,10 @@
 #import "TTRangeSlider.h"
 
 const int HANDLE_TOUCH_AREA_EXPANSION = -30; //expand the touch area of the handle by this much (negative values increase size) so that you don't have to touch right on the handle to activate it.
-const float HANDLE_DIAMETER = 16;
-const float TEXT_HEIGHT = 14;
 
 @interface TTRangeSlider ()
 
-@property (nonatomic, strong) CALayer *sliderLine;
+@property (nonatomic, strong) CAGradientLayer *sliderLine;
 
 @property (nonatomic, strong) CALayer *leftHandle;
 @property (nonatomic, assign) BOOL leftHandleSelected;
@@ -37,53 +35,86 @@ static const CGFloat kLabelsFontSize = 12.0f;
     _maxValue = 100;
     _selectedMaximum  = 90;
 
+    _lineHeight = 4;
+    _handleDiameter = 16;
+    
+    self.labelFont = [UIFont systemFontOfSize:kLabelsFontSize];
+    self.inactiveTrackTintColor = [UIColor lightGrayColor];
     //draw the slider line
-    self.sliderLine = [CALayer layer];
+    self.sliderLine = [CAGradientLayer layer];
     self.sliderLine.backgroundColor = self.tintColor.CGColor;
     [self.layer addSublayer:self.sliderLine];
     
+    [self.sliderLine setStartPoint:CGPointMake(0.0, 0.0)];
+    [self.sliderLine setEndPoint:CGPointMake(1.0, 0.0)];
+    
+    UIColor *activeColor = self.tintColor;
+    UIColor *inactiveColor = self.inactiveTrackTintColor;
+    
+    [self.sliderLine setColors:@[(id)inactiveColor.CGColor,
+                                 (id)inactiveColor.CGColor,
+                                 (id)activeColor.CGColor,
+                                 (id)activeColor.CGColor,
+                                 (id)inactiveColor.CGColor,
+                                 (id)inactiveColor.CGColor]];
+    
+    
     //draw the minimum slider handle
     self.leftHandle = [CALayer layer];
-    self.leftHandle.cornerRadius = 8.0f;
     self.leftHandle.backgroundColor = self.tintColor.CGColor;
     [self.layer addSublayer:self.leftHandle];
     
     //draw the maximum slider handle
     self.rightHandle = [CALayer layer];
-    self.rightHandle.cornerRadius = 8.0f;
     self.rightHandle.backgroundColor = self.tintColor.CGColor;
     [self.layer addSublayer:self.rightHandle];
-
-    self.leftHandle.frame = CGRectMake(0, 0, HANDLE_DIAMETER, HANDLE_DIAMETER);
-    self.rightHandle.frame = CGRectMake(0, 0, HANDLE_DIAMETER, HANDLE_DIAMETER);
+    
+    self.leftHandle.frame = CGRectMake(0, 0, _handleDiameter, _handleDiameter);
+    self.rightHandle.frame = CGRectMake(0, 0, _handleDiameter, _handleDiameter);
 
     //draw the text labels
     self.minLabel = [[CATextLayer alloc] init];
     self.minLabel.alignmentMode = kCAAlignmentCenter;
     self.minLabel.fontSize = kLabelsFontSize;
-    self.minLabel.frame = CGRectMake(0, 0, 75, TEXT_HEIGHT);
-    self.minLabel.contentsScale = [UIScreen mainScreen].scale;
     self.minLabel.contentsScale = [UIScreen mainScreen].scale;
     if (self.minLabelColour == nil){
         self.minLabel.foregroundColor = self.tintColor.CGColor;
     } else {
         self.minLabel.foregroundColor = self.minLabelColour.CGColor;
     }
-    [self.layer addSublayer:self.minLabel];
+    [self.layer insertSublayer:self.minLabel atIndex:0];
     
     self.maxLabel = [[CATextLayer alloc] init];
     self.maxLabel.alignmentMode = kCAAlignmentCenter;
     self.maxLabel.fontSize = kLabelsFontSize;
-    self.maxLabel.frame = CGRectMake(0, 0, 75, TEXT_HEIGHT);
     self.maxLabel.contentsScale = [UIScreen mainScreen].scale;
     if (self.maxLabelColour == nil){
         self.maxLabel.foregroundColor = self.tintColor.CGColor;
     } else {
         self.maxLabel.foregroundColor = self.maxLabelColour.CGColor;
     }
-    [self.layer addSublayer:self.maxLabel];
+    [self.layer insertSublayer:self.maxLabel atIndex:0];
     
     [self refresh];
+}
+
+- (void)setupHandleShadows {
+    if (!self.handleShadowColor ) {
+        self.leftHandle.shadowColor = nil;
+        self.leftHandle.shadowRadius = 0;
+        self.rightHandle.shadowColor = nil;
+        self.rightHandle.shadowRadius = 0;
+    }
+    
+    self.leftHandle.shadowColor = self.handleShadowColor.CGColor;
+    self.leftHandle.shadowOpacity = 1;
+    self.leftHandle.shadowRadius = self.handleShadowRadius;
+    self.leftHandle.shadowOffset = CGSizeMake(0, 1);
+    
+    self.rightHandle.shadowColor = self.leftHandle.shadowColor;
+    self.rightHandle.shadowOpacity = self.leftHandle.shadowOpacity;
+    self.rightHandle.shadowRadius = self.leftHandle.shadowRadius;
+    self.rightHandle.shadowOffset = self.leftHandle.shadowOffset;
 }
 
 - (void)layoutSubviews {
@@ -93,9 +124,10 @@ static const CGFloat kLabelsFontSize = 12.0f;
     float barSidePadding = 16.0f;
     CGRect currentFrame = self.frame;
     float yMiddle = currentFrame.size.height/2.0;
+    yMiddle = yMiddle - self.lineHeight/2;
     CGPoint lineLeftSide = CGPointMake(barSidePadding, yMiddle);
     CGPoint lineRightSide = CGPointMake(currentFrame.size.width-barSidePadding, yMiddle);
-    self.sliderLine.frame = CGRectMake(lineLeftSide.x, lineLeftSide.y, lineRightSide.x-lineLeftSide.x, 1);
+    self.sliderLine.frame = CGRectMake(lineLeftSide.x, lineLeftSide.y, lineRightSide.x-lineLeftSide.x, self.lineHeight);
 
     [self updateHandlePositions];
     [self updateLabelPositions];
@@ -122,10 +154,6 @@ static const CGFloat kLabelsFontSize = 12.0f;
     }
     
     return self;
-}
-
-- (CGSize)intrinsicContentSize{
-    return CGSizeMake(UIViewNoIntrinsicMetric, 65);
 }
 
 
@@ -177,6 +205,15 @@ static const CGFloat kLabelsFontSize = 12.0f;
 
     CGPoint rightHandleCenter = CGPointMake([self getXPositionAlongLineForValue:self.selectedMaximum], CGRectGetMidY(self.sliderLine.frame));
     self.rightHandle.position= rightHandleCenter;
+    
+    CGFloat leftHandlePercent = (leftHandleCenter.x - self.handleDiameter/2)/self.sliderLine.bounds.size.width;
+    if (self.leftHandle.hidden) {
+        leftHandlePercent = 0;
+    }
+    
+    CGFloat rightHandlePercent = (rightHandleCenter.x - self.handleDiameter/2)/self.sliderLine.bounds.size.width;
+
+    self.sliderLine.locations = @[@(0), @(leftHandlePercent), @(leftHandlePercent), @(rightHandlePercent), @(rightHandlePercent), @(1)];
 }
 
 - (void)updateLabelPositions {
@@ -185,25 +222,34 @@ static const CGFloat kLabelsFontSize = 12.0f;
     float minSpacingBetweenLabels = 8.0f;
     
     CGPoint leftHandleCentre = [self getCentreOfRect:self.leftHandle.frame];
-    CGPoint newMinLabelCenter = CGPointMake(leftHandleCentre.x, self.leftHandle.frame.origin.y - (self.minLabel.frame.size.height/2) - padding);
+    CGPoint newMinLabelCenter = CGPointMake(leftHandleCentre.x, CGRectGetMinY(self.leftHandle.frame) - (self.minLabel.frame.size.height/2) - padding);
     
     CGPoint rightHandleCentre = [self getCentreOfRect:self.rightHandle.frame];
-    CGPoint newMaxLabelCenter = CGPointMake(rightHandleCentre.x, self.rightHandle.frame.origin.y - (self.maxLabel.frame.size.height/2) - padding);
+    CGPoint newMaxLabelCenter = CGPointMake(rightHandleCentre.x, CGRectGetMinY(self.rightHandle.frame) - (self.maxLabel.frame.size.height/2) - padding);
     
-    CGSize minLabelTextSize = [self.minLabel.string sizeWithAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:kLabelsFontSize]}];
-    CGSize maxLabelTextSize = [self.maxLabel.string sizeWithAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:kLabelsFontSize]}];
+    CGSize minLabelTextSize = [self.minLabel.string sizeWithAttributes:@{NSFontAttributeName: self.labelFont}];
+    CGSize maxLabelTextSize = [self.maxLabel.string sizeWithAttributes:@{NSFontAttributeName: self.labelFont}];
     
     float newLeftMostXInMaxLabel = newMaxLabelCenter.x - maxLabelTextSize.width/2;
     float newRightMostXInMinLabel = newMinLabelCenter.x + minLabelTextSize.width/2;
     float newSpacingBetweenTextLabels = newLeftMostXInMaxLabel - newRightMostXInMinLabel;
+    
+    CGRect minFrame = self.minLabel.bounds;
+    minFrame.size = minLabelTextSize;
+    
+    CGRect maxFrame = self.maxLabel.bounds;
+    maxFrame.size = maxLabelTextSize;
+    
+    self.minLabel.bounds = minFrame;
+    self.maxLabel.bounds = maxFrame;
     
     if (newSpacingBetweenTextLabels > minSpacingBetweenLabels) {
         self.minLabel.position = newMinLabelCenter;
         self.maxLabel.position = newMaxLabelCenter;
     }
     else {
-        newMinLabelCenter = CGPointMake(self.minLabel.position.x, self.leftHandle.frame.origin.y - (self.minLabel.frame.size.height/2) - padding);
-        newMaxLabelCenter = CGPointMake(self.maxLabel.position.x, self.rightHandle.frame.origin.y - (self.maxLabel.frame.size.height/2) - padding);
+        newMinLabelCenter = CGPointMake(self.minLabel.position.x, CGRectGetMinY(self.leftHandle.frame) - (self.minLabel.frame.size.height/2) + padding);
+        newMaxLabelCenter = CGPointMake(self.maxLabel.position.x, CGRectGetMinY(self.rightHandle.frame) + (self.maxLabel.frame.size.height/2) + padding);
         self.minLabel.position = newMinLabelCenter;
         self.maxLabel.position = newMaxLabelCenter;
         
@@ -275,7 +321,7 @@ static const CGFloat kLabelsFontSize = 12.0f;
     CGPoint location = [touch locationInView:self];
     
     //find out the percentage along the line we are in x coordinate terms (subtracting half the frames width to account for moving the middle of the handle, not the left hand side)
-    float percentage = ((location.x-CGRectGetMinX(self.sliderLine.frame)) - HANDLE_DIAMETER/2) / (CGRectGetMaxX(self.sliderLine.frame) - CGRectGetMinX(self.sliderLine.frame));
+    float percentage = ((location.x-CGRectGetMinX(self.sliderLine.frame)) - self.handleDiameter/2) / (CGRectGetMaxX(self.sliderLine.frame) - CGRectGetMinX(self.sliderLine.frame));
     
     //multiply that percentage by self.maxValue to get the new selected minimum value
     float selectedValue = percentage * (self.maxValue - self.minValue) + self.minValue;
@@ -283,6 +329,7 @@ static const CGFloat kLabelsFontSize = 12.0f;
     if (self.leftHandleSelected)
     {
         if (selectedValue < self.selectedMaximum){
+            
             self.selectedMinimum = selectedValue;
         }
         else {
@@ -434,6 +481,37 @@ static const CGFloat kLabelsFontSize = 12.0f;
 -(void)setMaxLabelColour:(UIColor *)maxLabelColour{
     _maxLabelColour = maxLabelColour;
     self.maxLabel.foregroundColor = _maxLabelColour.CGColor;
+}
+
+- (void)setLabelFont:(UIFont *)labelFont {
+    _labelFont = labelFont;
+    self.maxLabel.font = (__bridge CFTypeRef)(labelFont);
+    self.maxLabel.fontSize = labelFont.pointSize;
+    self.minLabel.font = (__bridge CFTypeRef)(labelFont);
+    self.minLabel.fontSize = labelFont.pointSize;
+}
+
+-(void)setHandleDiameter:(float)handleDiameter {
+    _handleDiameter = handleDiameter;
+    self.leftHandle.cornerRadius = _handleDiameter/2;
+    self.rightHandle.cornerRadius = _handleDiameter/2;
+    self.leftHandle.frame = CGRectMake(self.leftHandle.frame.origin.x, 0, _handleDiameter, _handleDiameter);
+    self.rightHandle.frame = CGRectMake(self.rightHandle.frame.origin.x, 0, _handleDiameter, _handleDiameter);
+}
+
+- (void)setHandleShadowColor:(UIColor *)handleShadowColor {
+    _handleShadowColor = handleShadowColor;
+    [self setupHandleShadows];
+}
+
+- (void)setHandleShadowRadius:(float)handleShadowRadius {
+    _handleShadowRadius = handleShadowRadius;
+    [self setupHandleShadows];
+}
+
+-(void)setLineCornerRadius:(float)lineCornerRadius {
+    _lineCornerRadius = lineCornerRadius;
+    self.sliderLine.cornerRadius = lineCornerRadius;
 }
 
 -(void)setNumberFormatterOverride:(NSNumberFormatter *)numberFormatterOverride{
