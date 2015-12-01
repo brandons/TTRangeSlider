@@ -67,7 +67,7 @@ IB_DESIGNABLE
  * In this case, the selectedMinValue will be not functional anymore. Use selectedMaxValue instead to determine the value the user has selected.
  */
 @property (nonatomic, assign) IBInspectable BOOL disableRange;
-
+- (void)initialiseControl;
 - (float)getPercentageAlongLineForValue:(float) value;
 
 @end
